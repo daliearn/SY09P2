@@ -1,0 +1,59 @@
+---
+title: "Projet 2"
+output: html_notebook
+---
+
+```{r}
+binaryNBCfit <- function(Xapp, zapp) {
+  K <- length(unique(zapp))
+  piks <- c()
+  pkjs <- c() 
+  for (k in 1:K){
+    Xk <- Xapp[which(zapp == k),]
+    pik <- dim(Xk)[1] / dim(Xapp)[1]
+    pk <- colSums(Xk) / pik
+    piks <- c(piks, pik)
+    pkjs <- c(pkjs, pk)
+  }
+  return( list(piks = piks, pkjs = pkjs))
+  
+}
+
+#Pas fou : peut etre remplacer par des 61
+binaryNBCval <- function(Xtst, params) {
+  n <- dim(Xtst)[1]
+	p <- dim(Xtst)[2]
+	g <- length(params$piks)
+
+	prob <- matrix(0, ncol=g, nrow = n)
+	pkjs <- matrix(params$pkjs, nrow = p, ncol = g, byrow = FALSE)
+	
+  for(k in 1:g) {
+    #Ligne problématique, faut-il multiplier pour "appliquer les pkjs"
+    prob[,k] <- params$piks[k] * ( as.matrix(Xtst) %*% pkjs[,k] )
+  }
+	pred <- max.col(prob)
+	prob <- prob / rowSums(prob)
+	return(list(prob = prob, pred = pred))
+}
+
+spambase2 <- read.csv(file = "donnees/donnees/spambase2.csv")
+napp = 4000
+
+Xapp <- spambase2[sample(nrow(spambase2), napp),]
+
+Zapp <- Xapp[,dim(Xapp)[2]]
+Xapp <- Xapp[, -c(1, dim(Xapp)[2])]
+
+params <- binaryNBCfit(Xapp[1:napp,], Zapp[1:napp])
+
+test <- binaryNBCval(spambase2[napp + 1:dim(spambase2)[1],-c(1, dim(Xapp)[2])], params)
+ztst <- spambase2[napp + 1:dim(spambase2)[1], dim(Xapp)[2]]
+err <- ztst != test$pred
+
+print(1 - length(which(ztst != test$pred))/(dim(spambase2[napp + 1:dim(spambase2)[1],])[1]))
+print(length(which(test$pred == 1)))
+print(length(which(test$pred == 2)))
+
+```
+
