@@ -4,33 +4,41 @@ output: html_notebook
 ---
 
 ```{r}
+#Apprentissage
 binaryNBCfit <- function(Xapp, zapp) {
   K <- length(unique(zapp))
+  #Efefectif par classe
   piks <- c()
-  pkjs <- c() 
+  #prob à posteriori
+  pkjs <- c()
+  #Pour chaque classe : on extrait les individus appartenant a la classe puis on calcule les EMV
   for (k in 1:K){
     Xk <- Xapp[which(zapp == k),]
     pik <- dim(Xk)[1] / dim(Xapp)[1]
-    pk <- colSums(Xk) / pik
+    pk <- colSums(Xk) / dim(Xk)[1]
     piks <- c(piks, pik)
     pkjs <- c(pkjs, pk)
   }
+  pkjs <- matrix(pkjs, nrow = dim(Xapp)[2], ncol = length(piks), byrow = FALSE)
   return( list(piks = piks, pkjs = pkjs))
   
 }
 
-#Pas fou : peut etre remplacer par des 61
 binaryNBCval <- function(Xtst, params) {
   n <- dim(Xtst)[1]
 	p <- dim(Xtst)[2]
 	g <- length(params$piks)
 
 	prob <- matrix(0, ncol=g, nrow = n)
-	pkjs <- matrix(params$pkjs, nrow = p, ncol = g, byrow = FALSE)
+	pkjs <- params$pkjs
+	
+	
 	
   for(k in 1:g) {
-    #Ligne problématique, faut-il multiplier pour "appliquer les pkjs"
-    prob[,k] <- params$piks[k] * ( as.matrix(Xtst) %*% pkjs[,k] )
+    temp <- apply(Xtst, 1, function(x) {
+      prod((pkjs[,k] ** x) * ((1 - pkjs[,k]) ** (1-x)))
+    })
+    prob[,k] <- params$piks[k] * temp 
   }
 	pred <- max.col(prob)
 	prob <- prob / rowSums(prob)
@@ -40,20 +48,28 @@ binaryNBCval <- function(Xtst, params) {
 spambase2 <- read.csv(file = "donnees/donnees/spambase2.csv")
 napp = 4000
 
-Xapp <- spambase2[sample(nrow(spambase2), napp),]
+spambase2[sample(nrow(spambase2), nrow(spambase2), replace = FALSE),]
+row.names(spambase2) <- NULL
+
+Xapp <- spambase2[sample(nrow(spambase2[1:napp,]), napp, replace = FALSE),]
+row.names(Xapp) <- NULL
 
 Zapp <- Xapp[,dim(Xapp)[2]]
 Xapp <- Xapp[, -c(1, dim(Xapp)[2])]
-
 params <- binaryNBCfit(Xapp[1:napp,], Zapp[1:napp])
 
-test <- binaryNBCval(spambase2[napp + 1:dim(spambase2)[1],-c(1, dim(Xapp)[2])], params)
-ztst <- spambase2[napp + 1:dim(spambase2)[1], dim(Xapp)[2]]
-err <- ztst != test$pred
+Xtst <- spambase2[sample(nrow(spambase2[(napp + 1):dim(spambase2)[1],]), nrow(spambase2[(napp + 1):dim(spambase2)[1],]) , replace = FALSE),]
+row.names(Xtst) <- NULL
 
-print(1 - length(which(ztst != test$pred))/(dim(spambase2[napp + 1:dim(spambase2)[1],])[1]))
-print(length(which(test$pred == 1)))
-print(length(which(test$pred == 2)))
+Ztst <- Xtst[, dim(Xtst)[2]]
+Xtst <- Xtst[, -c(1, dim(Xtst)[2])]
 
+
+test <- binaryNBCval(Xtst, params)
+err <- Ztst != test$pred
+
+print(1 - (length(which(err))/(length(err))))
+
+#Plusieurs probleme : faudrait vraiment isoler les valeurs de test des valeurs d'apprentissage
 ```
 
